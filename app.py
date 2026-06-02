@@ -199,7 +199,7 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-st.caption("発注履歴を参照し、型式から品名・発注先・単価を自動入力します（Google Cloud不要）。")
+st.caption("発注履歴を参照し、型式から単価・発注先・メーカー・仕様URLを自動入力します（Google Cloud不要）。")
 
 # ---------------------------------------------------------------------------
 # 使い方ガイド(UI内)
@@ -244,9 +244,11 @@ with st.expander("📖 使い方ガイド（クリックで開閉）", expanded=
 - **公開URLから取得** — 単一のGoogleスプレッドシート（型式・品名・発注先・単価…）のURLを貼ります。
 - **ローカル履歴ファイル** — 手元の履歴 .xlsx / .csv を直接アップロードします。
 
-**補完のしくみ**：新規発注リストの **A列「型式」** をキーに履歴を検索し、
-**品名・発注先・単価** を自動入力。**合計金額＝単価×数量** を計算します。
-履歴に無い型式は空欄のまま **状態列に「新規」**（黄色）を立てます。
+**補完のしくみ**：新規発注リストの **A列「型式」** をキーに、
+- **単価(D列)・発注先(E列)** … 発注履歴（見積/発注元）から自動入力
+- **メーカー(B列)** … 「型式→メーカー対応表」から自動入力（サイドバーで指定）
+- **合計金額(F列)** … 単価×数量 を計算
+- **仕様URL(G列)** … 型式で検索するリンクを自動生成（Google/MISUMI/モノタロウから選択）
 
 > 💡 困ったら：実行後に出る「読み込んだファイル／スキップ／エラー」の表示で原因を確認できます。
         """
@@ -296,6 +298,26 @@ with st.sidebar:
         st.caption("列構成: A型式 B品名 C発注先 D単価 E備考")
 
     st.divider()
+    st.subheader("🏭 型式→メーカー対応表")
+    st.download_button(
+        "📄 対応表テンプレートをDL",
+        data=core.build_maker_template(),
+        file_name="型式メーカー対応表_テンプレート.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+    )
+    maker_file = st.file_uploader(
+        "対応表 (.xlsx / .csv)", type=["xlsx", "csv"], key="maker",
+        help="A列=型式, B列=メーカー の表。B列「メーカー」の自動入力に使います。",
+    )
+    st.caption("列構成: A型式 B メーカー（見出しがあれば名前でも自動判別）")
+
+    st.divider()
+    spec_engine_label = st.selectbox(
+        "G列『仕様URL』の検索先",
+        ["Google", "MISUMI", "モノタロウ"],
+        help="型式で検索するリンクを自動生成します。",
+    )
     fill_total = st.checkbox("合計金額(単価×数量)を計算する", value=True)
 
     # -----------------------------------------------------------------------
@@ -354,12 +376,12 @@ with col_b:
         "| 列 | 内容 | 入力 |\n"
         "|---|---|---|\n"
         "| A | 型式 | **手入力(キー)** |\n"
-        "| B | 品名 | 自動 |\n"
-        "| C | 発注先 | 自動 |\n"
-        "| D | 単価 | 自動 |\n"
-        "| E | 数量 | **手入力** |\n"
+        "| B | メーカー | 自動(対応表) |\n"
+        "| C | 数量 | **手入力** |\n"
+        "| D | 単価 | 自動(履歴) |\n"
+        "| E | 発注先 | 自動(履歴) |\n"
         "| F | 合計金額 | 自動 |\n"
-        "| G | 状態 | 自動(OK/新規) |"
+        "| G | 仕様URL | 自動(検索リンク) |"
     )
 
 st.divider()
@@ -435,9 +457,25 @@ if run:
             st.warning("履歴データが0件でした。フォルダパス・列構成・共有設定を確認してください。")
             st.stop()
 
+        # 型式→メーカー対応表(任意)
+        maker_map = {}
+        if maker_file is not None:
+            if maker_file.name.lower().endswith(".csv"):
+                import io as _io, csv as _csv
+                _text = maker_file.getvalue().decode("utf-8-sig", errors="replace")
+                maker_map = core.load_maker_map_from_rows(list(_csv.reader(_io.StringIO(_text))))
+            else:
+                maker_map = core.load_maker_map_from_file(maker_file.getvalue())
+            st.info(f"型式→メーカー対応表を {len(maker_map)} 件読み込みました。")
+
+        _engine = {"Google": "google", "MISUMI": "misumi", "モノタロウ": "monotaro"}.get(
+            spec_engine_label, "google"
+        )
+
         with st.spinner("照合・補完中..."):
             output_bytes, result = core.process_workbook(
-                uploaded.getvalue(), history, fill_total=fill_total
+                uploaded.getvalue(), history,
+                maker_map=maker_map, fill_total=fill_total, spec_engine=_engine,
             )
 
         # サマリ
