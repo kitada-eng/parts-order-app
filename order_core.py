@@ -365,68 +365,75 @@ def process_workbook(
     maker_map = maker_map or {}
     if isinstance(source, bytes):
         source = io.BytesIO(source)
-    wb = load_workbook(source)
-    ws = wb.active
-    cols = _detect_columns(ws)
+    in_wb = load_workbook(source, data_only=True)
+    in_ws = in_wb.active
+    cols = _detect_columns(in_ws)
+    model_col = cols["model"]
+    qty_col = cols["qty"]
 
-    # 見出しが空なら補う(メーカー / 発注先 / 仕様URL)
-    if ws.cell(row=1, column=cols["maker"]).value in (None, ""):
-        ws.cell(row=1, column=cols["maker"]).value = "メーカー"
-    if ws.cell(row=1, column=cols["vendor"]).value in (None, ""):
-        ws.cell(row=1, column=cols["vendor"]).value = "発注先"
-    if ws.cell(row=1, column=cols["spec_url"]).value in (None, ""):
-        ws.cell(row=1, column=cols["spec_url"]).value = "仕様URL"
+    # 出力は必ず正しい列見出しで作り直す
+    # (A型式 B メーカー C数量 D単価 E発注先 F合計金額 G仕様URL)
+    out_wb = Workbook()
+    ws = out_wb.active
+    ws.title = "新規発注リスト"
+    headers = ["型式", "メーカー", "数量", "単価", "発注先", "合計金額", "仕様URL"]
+    widths = [22, 14, 8, 12, 16, 12, 40]
+    bold = Font(bold=True)
+    head_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+    for i, h in enumerate(headers, start=1):
+        c = ws.cell(row=1, column=i, value=h)
+        c.font = bold
+        c.fill = head_fill
+        ws.column_dimensions[get_column_letter(i)].width = widths[i - 1]
 
     result = ProcessResult()
-
-    for r in range(2, ws.max_row + 1):
-        model = _normalize_model(ws.cell(row=r, column=cols["model"]).value)
+    out_r = 1
+    for r in range(2, in_ws.max_row + 1):
+        model = _normalize_model(in_ws.cell(row=r, column=model_col).value)
         if not model:
             continue
+        out_r += 1
         result.total_rows += 1
+
+        qty_raw = in_ws.cell(row=r, column=qty_col).value
+        qty = _parse_price(qty_raw)
 
         # 履歴から 単価・発注先 を補完
         rec = history.get(model)
         if rec is not None:
-            ws.cell(row=r, column=cols["price"]).value = rec.price
-            ws.cell(row=r, column=cols["vendor"]).value = rec.vendor or None
+            price = rec.price
+            vendor = rec.vendor or ""
             result.matched += 1
-            price_for_total = rec.price
         else:
-            ws.cell(row=r, column=cols["price"]).value = None
-            ws.cell(row=r, column=cols["vendor"]).value = None
+            price = None
+            vendor = ""
             result.new_items += 1
             result.new_models.append(model)
-            price_for_total = None
 
-        # メーカー(対応表より)
-        maker = maker_map.get(model, "")
-        ws.cell(row=r, column=cols["maker"]).value = maker or None
+        maker = maker_map.get(model, "")  # メーカー(対応表より)
+        total = (price * qty) if (fill_total and price is not None and qty is not None) else None
+        url = build_spec_url(model, maker, spec_engine)  # 仕様URL(検索リンク)
 
-        # 合計金額 = 単価 × 数量
-        if fill_total:
-            qty = _parse_price(ws.cell(row=r, column=cols["qty"]).value)
-            if price_for_total is not None and qty is not None:
-                ws.cell(row=r, column=cols["total"]).value = price_for_total * qty
-            else:
-                ws.cell(row=r, column=cols["total"]).value = None
+        ws.cell(row=out_r, column=COL_MODEL, value=model)
+        ws.cell(row=out_r, column=COL_MAKER, value=maker or None)
+        ws.cell(row=out_r, column=COL_QTY, value=qty_raw)
+        ws.cell(row=out_r, column=COL_PRICE, value=price)
+        ws.cell(row=out_r, column=COL_VENDOR, value=vendor or None)
+        ws.cell(row=out_r, column=COL_TOTAL, value=total)
+        ws.cell(row=out_r, column=COL_SPECURL, value=url)
 
-        # 仕様URL(型式の検索リンク)
-        ws.cell(row=r, column=cols["spec_url"]).value = build_spec_url(model, maker, spec_engine)
-
-        # プレビュー用
         result.preview.append({
             "型式": model,
             "メーカー": maker,
-            "数量": ws.cell(row=r, column=cols["qty"]).value,
-            "単価": ws.cell(row=r, column=cols["price"]).value,
-            "発注先": ws.cell(row=r, column=cols["vendor"]).value or "",
-            "合計金額": ws.cell(row=r, column=cols["total"]).value,
-            "仕様URL": ws.cell(row=r, column=cols["spec_url"]).value,
+            "数量": qty_raw,
+            "単価": price,
+            "発注先": vendor,
+            "合計金額": total,
+            "仕様URL": url,
         })
 
     out = io.BytesIO()
-    wb.save(out)
+    out_wb.save(out)
     return out.getvalue(), result
 
 

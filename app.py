@@ -23,134 +23,180 @@ import order_core as core
 
 st.set_page_config(page_title="部品発注リスト自動補完", page_icon="📦", layout="wide")
 
+
 # ---------------------------------------------------------------------------
-# モダンなダークテーマ(カスタムCSS)
+# 物流倉庫テーマ(カスタムCSS)
 # ---------------------------------------------------------------------------
 def inject_theme_css():
     st.markdown(
         """
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700;800&display=swap');
 
-        html, body, [class*="css"], .stApp, [data-testid="stSidebar"] {
-            font-family: 'Inter', 'Segoe UI', sans-serif;
+        html, body, [class*="css"], .stApp, [data-testid="stSidebar"],
+        input, textarea, button, select {
+            font-family: 'M PLUS 1p', 'Yu Gothic', 'Meiryo', sans-serif !important;
         }
 
-        /* 背景: 深い宇宙的グラデーション */
+        /* 背景: コンクリート＋うっすら棚グリッド */
         .stApp {
-            background: radial-gradient(1200px 600px at 15% -10%, #243049 0%, rgba(15,23,42,0) 60%),
-                        radial-gradient(1000px 500px at 100% 0%, #2a1e4a 0%, rgba(15,23,42,0) 55%),
-                        linear-gradient(160deg, #0b1220 0%, #0f172a 50%, #060a14 100%);
-            background-attachment: fixed;
-            color: #e2e8f0;
+            background-color: #eef1f5;
+            background-image:
+                linear-gradient(rgba(100,116,139,.06) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(100,116,139,.06) 1px, transparent 1px);
+            background-size: 42px 42px;
+            color: #1f2a37;
+        }
+        /* 上端のハザードストライプ(安全色) */
+        .stApp::before {
+            content: ""; position: fixed; top: 0; left: 0; right: 0; height: 7px; z-index: 5;
+            background: repeating-linear-gradient(45deg, #FFC400 0 14px, #1a1a1a 14px 28px);
         }
 
-        /* 文字色(config.toml が無くても読めるよう明示) */
+        /* 文字色 */
         .stApp, .stMarkdown, .stMarkdown p, .stMarkdown li, .stApp p, .stApp li,
         label, [data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] p,
         .stRadio label, .stCheckbox label, .stSlider label,
-        [data-testid="stExpander"] summary, [data-testid="stMetricLabel"],
-        [data-testid="stMarkdownContainer"] {
-            color: #e2e8f0 !important;
+        [data-testid="stExpander"] summary, [data-testid="stMarkdownContainer"] {
+            color: #1f2a37 !important;
         }
-        [data-testid="stCaptionContainer"], .stCaption, small { color: #94a3b8 !important; }
-        /* 上部ヘッダーバーを透過 */
+        [data-testid="stCaptionContainer"], .stCaption, small { color: #5b6675 !important; }
         [data-testid="stHeader"] { background: transparent; }
 
-        /* タイトルをグラデーション文字に */
-        h1 {
-            font-family: 'Poppins', sans-serif !important;
+        /* 見出し: 濃いスレート＋アンバーの下線 */
+        h1, h2, h3 {
+            font-family: 'M PLUS 1p', sans-serif !important;
+            color: #1f2a37 !important;
             font-weight: 800 !important;
             letter-spacing: .5px;
-            background: linear-gradient(90deg, #a78bfa 0%, #60a5fa 45%, #22d3ee 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            text-shadow: 0 0 30px rgba(139,92,246,.25);
         }
-        h2, h3 { font-family: 'Poppins', sans-serif !important; font-weight: 600 !important; color:#e9edf5; }
+        h2, h3 { border-left: 6px solid #F5A623; padding-left: 10px; }
 
-        /* メインコンテナを少し中央寄せに */
-        .block-container { padding-top: 2.2rem; max-width: 1200px; }
+        .block-container { padding-top: 2.2rem; max-width: 1150px; }
 
-        /* サイドバー: すりガラス */
+        /* サイドバー: 明るいスチール */
         [data-testid="stSidebar"] > div:first-child {
-            background: rgba(17, 25, 40, 0.75);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
-            border-right: 1px solid rgba(148,163,184,0.12);
+            background: #f4f6fa;
+            border-right: 2px solid #cfd6e2;
         }
+        [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 { border-left-color:#2c5282; }
 
-        /* 通常ボタン */
+        /* ボタン: スチールスレート */
         .stButton > button, .stDownloadButton > button {
-            border-radius: 12px;
-            border: 1px solid rgba(148,163,184,0.25);
-            background: rgba(30,41,59,0.55);
-            color: #e2e8f0;
-            font-weight: 600;
+            border-radius: 8px;
+            border: 1px solid #1f2a37 !important;
+            background: #334155;
+            color: #fff !important;
+            font-weight: 700;
             padding: .5rem 1rem;
-            transition: all .18s ease;
+            box-shadow: 0 2px 6px rgba(31,42,55,.18);
+            transition: all .15s ease;
         }
         .stButton > button:hover, .stDownloadButton > button:hover {
-            transform: translateY(-2px);
-            border-color: #a78bfa;
-            box-shadow: 0 8px 22px rgba(124,58,237,.32);
-            color: #fff;
+            background: #1f2a37; transform: translateY(-1px);
+            box-shadow: 0 5px 14px rgba(31,42,55,.28); color:#fff !important;
         }
-        /* 主要ボタン(実行/DL): グラデーション */
+        /* 主要ボタン(実行/DL): 安全アンバー */
         .stButton > button[kind="primary"], .stDownloadButton > button[kind="primary"] {
-            background: linear-gradient(95deg, #7c3aed 0%, #4f46e5 50%, #2563eb 100%);
-            border: none; color: #fff;
-            box-shadow: 0 6px 18px rgba(79,70,229,.35);
+            background: #F5A623; color:#1f2a37 !important; border-color:#b9791000 !important;
+            border: 1px solid #b97910 !important;
         }
         .stButton > button[kind="primary"]:hover, .stDownloadButton > button[kind="primary"]:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 28px rgba(99,102,241,.55);
+            background: #e0940f; color:#1f2a37 !important;
+        }
+        /* ボタン内ラベル(markdown)の文字色を明示(全体ルールに負けないように) */
+        .stButton > button p, .stButton > button [data-testid="stMarkdownContainer"],
+        .stDownloadButton > button p, .stDownloadButton > button [data-testid="stMarkdownContainer"] {
+            color: #ffffff !important;
+        }
+        .stButton > button[kind="primary"] p, .stButton > button[kind="primary"] [data-testid="stMarkdownContainer"],
+        .stDownloadButton > button[kind="primary"] p, .stDownloadButton > button[kind="primary"] [data-testid="stMarkdownContainer"] {
+            color: #1f2a37 !important;
         }
 
-        /* メトリクスをカード化 */
+        /* メトリクス: 白カード＋アンバーの左帯 */
         [data-testid="stMetric"] {
-            background: linear-gradient(180deg, rgba(40,52,78,0.6), rgba(24,32,52,0.6));
-            border: 1px solid rgba(148,163,184,0.18);
-            border-radius: 16px;
-            padding: 16px 18px;
-            backdrop-filter: blur(6px);
-            box-shadow: 0 8px 24px rgba(2,6,23,.35);
+            background: #ffffff;
+            border: 1px solid #d6dce6;
+            border-left: 6px solid #F5A623;
+            border-radius: 10px;
+            padding: 14px 18px;
+            box-shadow: 0 4px 12px rgba(31,42,55,.08);
         }
-        [data-testid="stMetricValue"] { color: #c4b5fd; font-weight: 700; }
+        [data-testid="stMetricValue"] { color:#1f2a37 !important; font-weight:800; }
+        [data-testid="stMetricLabel"], [data-testid="stMetricLabel"] p { color:#5b6675 !important; }
 
         /* 入力欄 */
-        .stTextInput input, .stNumberInput input, .stTextArea textarea {
-            border-radius: 10px !important;
-            background: rgba(15,23,42,0.6) !important;
-            border: 1px solid rgba(148,163,184,0.22) !important;
-            color: #e2e8f0 !important;
+        .stTextInput input, .stNumberInput input, .stTextArea textarea,
+        [data-baseweb="select"] > div {
+            border-radius: 8px !important;
+            background: #fff !important;
+            border: 1px solid #cbd5e1 !important;
+            color: #1f2a37 !important;
         }
-        .stTextInput input:focus { border-color:#8b5cf6 !important; box-shadow:0 0 0 2px rgba(139,92,246,.25)!important; }
+        .stTextInput input:focus { box-shadow: 0 0 0 3px rgba(245,166,35,.35) !important; border-color:#F5A623 !important; }
 
         /* ファイルアップローダ */
         [data-testid="stFileUploaderDropzone"] {
-            background: rgba(30,41,59,0.4);
-            border: 1.5px dashed rgba(139,92,246,0.45);
-            border-radius: 14px;
+            background: #fbfcfe;
+            border: 2px dashed #94a3b8;
+            border-radius: 10px;
         }
 
-        /* アラート(info/success/warning) 角丸 */
-        [data-testid="stAlert"] { border-radius: 12px; }
+        /* アラート */
+        [data-testid="stAlert"] { border-radius: 10px; border: 1px solid #d6dce6; }
 
-        /* expander / dataframe を角丸 */
+        /* expander: 白カード */
         [data-testid="stExpander"] {
-            border: 1px solid rgba(148,163,184,0.15);
-            border-radius: 14px;
-            background: rgba(24,32,52,0.45);
+            border: 1px solid #d6dce6;
+            border-radius: 12px;
+            background: #ffffff;
+            box-shadow: 0 4px 12px rgba(31,42,55,.07);
         }
-        [data-testid="stDataFrame"] { border-radius: 12px; overflow: hidden; }
+        [data-testid="stDataFrame"] { border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; }
 
-        /* タブ・ラジオのアクセント */
-        .stRadio [data-baseweb="radio"] div[aria-checked="true"] { border-color:#8b5cf6 !important; }
+        hr { border-color: #d6dce6 !important; }
 
-        /* 区切り線を淡く */
-        hr { border-color: rgba(148,163,184,0.15) !important; }
+        /* ===== 倉庫の風景バナー(タイトル下) ===== */
+        .wh-stage {
+            position: relative; height: 140px; margin: .3rem 0 1.1rem;
+            border: 1px solid #cfd6e2; border-radius: 12px; overflow: hidden;
+            background: linear-gradient(#f8fafc, #e7ecf3);
+            box-shadow: 0 6px 18px rgba(31,42,55,.08);
+        }
+        .wh-stage > * { position: absolute; }
+        .wh-stage .floor  { left:0; right:0; bottom:0; height:26px; background:#c9d0db; border-top:2px solid #aab3c2; }
+        .wh-stage .hazard { left:0; right:0; bottom:0; height:7px;
+            background: repeating-linear-gradient(45deg, #FFC400 0 12px, #222 12px 24px); }
+
+        /* スチール棚 */
+        .wh-rack { bottom:26px; height:104px; width:230px; }
+        .wh-rack .post  { position:absolute; top:0; width:7px; height:100%; border-radius:2px;
+            background: linear-gradient(#5b6675,#3c4554); }
+        .wh-rack .post.l { left:0; } .wh-rack .post.r { right:0; }
+        .wh-rack .shelf { position:absolute; left:0; right:0; height:7px; border-radius:2px;
+            background: linear-gradient(#6b7686,#49525f); }
+        .wh-rack .shelf.s1 { top:0; } .wh-rack .shelf.s2 { top:48px; } .wh-rack .shelf.s3 { bottom:0; }
+        .wh-box { position:absolute; background: linear-gradient(#d8a45f,#c2873f);
+            border:1px solid #9c6a2b; border-radius:3px; }
+        .wh-box::after { content:""; position:absolute; left:0; right:0; top:44%; height:3px; background:rgba(120,80,30,.45); }
+
+        /* フォークリフト(走行) */
+        .forklift { bottom:26px; left:-100px; width:80px; height:58px; animation: drive 12s linear infinite; }
+        .forklift .cab  { position:absolute; bottom:12px; left:22px; width:40px; height:30px;
+            background:#F5A623; border:2px solid #8a5e0c; border-radius:6px 10px 4px 4px; }
+        .forklift .roof { position:absolute; bottom:34px; left:24px; width:34px; height:4px; background:#444; border-radius:2px; }
+        .forklift .pillar { position:absolute; bottom:12px; right:18px; width:4px; height:24px; background:#444; }
+        .forklift .mast { position:absolute; bottom:6px; left:12px; width:5px; height:46px; background:#3a3f47; }
+        .forklift .fork { position:absolute; bottom:8px; left:-4px; width:18px; height:4px; background:#2b2f35; }
+        .forklift .load { position:absolute; bottom:12px; left:-8px; width:22px; height:20px;
+            background: linear-gradient(#d8a45f,#c2873f); border:2px solid #9c6a2b; border-radius:2px; }
+        .forklift .w1, .forklift .w2 { position:absolute; bottom:0; width:16px; height:16px; border-radius:50%;
+            background:#222; border:3px solid #6b7280; }
+        .forklift .w1 { left:24px; } .forklift .w2 { left:44px; }
+        @keyframes drive { 0% { left:-100px; } 100% { left:112%; } }
+
+        @media (max-width: 900px){ .wh-rack { display:none; } }
         </style>
         """,
         unsafe_allow_html=True,
@@ -167,7 +213,7 @@ BG_PATH = os.path.join(ASSETS_DIR, "background.png")
 
 
 def apply_background(image_bytes: bytes, overlay: float):
-    """画面に背景画像を適用する。overlay(0〜1)が大きいほど暗くなり文字が読みやすい(ダーク基調)。"""
+    """画面に背景画像を適用する。overlay(0〜1)が大きいほど白く薄くなり文字が読みやすい。"""
     mime = "image/jpeg" if image_bytes[:2] == b"\xff\xd8" else "image/png"
     b64 = base64.b64encode(image_bytes).decode()
     st.markdown(
@@ -175,7 +221,7 @@ def apply_background(image_bytes: bytes, overlay: float):
         <style>
         .stApp {{
             background-image: linear-gradient(
-                rgba(8,12,22,{overlay}), rgba(8,12,22,{overlay})),
+                rgba(238,241,245,{overlay}), rgba(238,241,245,{overlay})),
                 url("data:{mime};base64,{b64}");
             background-size: cover;
             background-position: center;
@@ -187,19 +233,56 @@ def apply_background(image_bytes: bytes, overlay: float):
     )
 
 
+# タイトル
 st.markdown(
     """
-    <div style="margin-bottom:.4rem;">
-      <span style="font-family:'Poppins',sans-serif;font-size:2.1rem;font-weight:800;
-        background:linear-gradient(90deg,#a78bfa,#60a5fa,#22d3ee);
-        -webkit-background-clip:text;-webkit-text-fill-color:transparent;">
-        📦 部品発注リスト 自動補完システム
+    <div style="display:flex; align-items:center; gap:12px; margin:.2rem 0 .3rem;">
+      <span style="font-size:2rem;">📦</span>
+      <span style="font-family:'M PLUS 1p',sans-serif; font-size:1.9rem; font-weight:800;
+        color:#1f2a37; letter-spacing:.5px;">
+        部品発注リスト 自動補完システム
       </span>
+      <span style="background:#F5A623; color:#1f2a37; font-weight:700; font-size:.72rem;
+        padding:3px 8px; border-radius:6px; border:1px solid #b97910;">LOGISTICS</span>
     </div>
     """,
     unsafe_allow_html=True,
 )
 st.caption("発注履歴を参照し、型式から単価・発注先・メーカー・仕様URLを自動入力します（Google Cloud不要）。")
+
+# 倉庫の風景バナー(スチール棚＋段ボール箱＋走るフォークリフト)
+st.markdown(
+    """
+    <div class="wh-stage">
+      <div class="wh-rack" style="right:5%;">
+        <div class="post l"></div><div class="post r"></div>
+        <div class="shelf s1"></div><div class="shelf s2"></div><div class="shelf s3"></div>
+        <div class="wh-box" style="left:16px;  top:10px;  width:46px; height:32px;"></div>
+        <div class="wh-box" style="left:70px;  top:14px;  width:38px; height:28px;"></div>
+        <div class="wh-box" style="left:120px; top:8px;   width:52px; height:34px;"></div>
+        <div class="wh-box" style="left:22px;  top:58px;  width:40px; height:32px;"></div>
+        <div class="wh-box" style="left:78px;  top:60px;  width:50px; height:30px;"></div>
+        <div class="wh-box" style="left:140px; top:56px;  width:44px; height:34px;"></div>
+      </div>
+      <div class="wh-rack" style="left:6%;">
+        <div class="post l"></div><div class="post r"></div>
+        <div class="shelf s1"></div><div class="shelf s2"></div><div class="shelf s3"></div>
+        <div class="wh-box" style="left:20px;  top:12px;  width:48px; height:30px;"></div>
+        <div class="wh-box" style="left:90px;  top:9px;   width:50px; height:33px;"></div>
+        <div class="wh-box" style="left:30px;  top:58px;  width:44px; height:32px;"></div>
+        <div class="wh-box" style="left:110px; top:60px;  width:46px; height:30px;"></div>
+      </div>
+      <div class="forklift">
+        <div class="load"></div><div class="fork"></div><div class="mast"></div>
+        <div class="roof"></div><div class="pillar"></div><div class="cab"></div>
+        <div class="w1"></div><div class="w2"></div>
+      </div>
+      <div class="floor"></div>
+      <div class="hazard"></div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ---------------------------------------------------------------------------
 # 使い方ガイド(UI内)
@@ -208,25 +291,25 @@ with st.expander("📖 使い方ガイド（クリックで開閉）", expanded=
     st.markdown(
         """
         <div style="display:flex;gap:14px;flex-wrap:wrap;margin:.2rem 0 1rem;">
-          <div style="flex:1;min-width:210px;background:linear-gradient(180deg,rgba(124,58,237,.18),rgba(37,99,235,.10));
-               border:1px solid rgba(148,163,184,.18);border-radius:16px;padding:14px 16px;">
-            <div style="font-size:1.4rem;">①</div>
-            <b style="color:#c4b5fd;">履歴データを指定</b><br>
-            <span style="color:#cbd5e1;font-size:.9rem;">
+          <div style="flex:1;min-width:210px;background:#2c5282;
+               border:1px solid #1f3a5f;border-radius:10px;padding:14px 16px;box-shadow:0 4px 12px rgba(31,42,55,.12);color:#fff;">
+            <div style="font-size:1.4rem;font-weight:800;">①</div>
+            <b style="color:#fff;">履歴データを指定</b><br>
+            <span style="color:#dbe6f3;font-size:.9rem;">
             サイドバーで取得方式を選び、<b>Driveの共有フォルダURL</b>（または履歴ファイル）を入力。</span>
           </div>
-          <div style="flex:1;min-width:210px;background:linear-gradient(180deg,rgba(124,58,237,.18),rgba(37,99,235,.10));
-               border:1px solid rgba(148,163,184,.18);border-radius:16px;padding:14px 16px;">
-            <div style="font-size:1.4rem;">②</div>
-            <b style="color:#c4b5fd;">新規発注リストを用意</b><br>
-            <span style="color:#cbd5e1;font-size:.9rem;">
+          <div style="flex:1;min-width:210px;background:#F5A623;
+               border:1px solid #b97910;border-radius:10px;padding:14px 16px;box-shadow:0 4px 12px rgba(31,42,55,.12);color:#1f2a37;">
+            <div style="font-size:1.4rem;font-weight:800;">②</div>
+            <b style="color:#1f2a37;">新規発注リストを用意</b><br>
+            <span style="color:#4a3a12;font-size:.9rem;">
             下の「空テンプレート」をDLし、<b>型式</b>と<b>数量</b>を入力してアップロード。</span>
           </div>
-          <div style="flex:1;min-width:210px;background:linear-gradient(180deg,rgba(124,58,237,.18),rgba(37,99,235,.10));
-               border:1px solid rgba(148,163,184,.18);border-radius:16px;padding:14px 16px;">
-            <div style="font-size:1.4rem;">③</div>
-            <b style="color:#c4b5fd;">実行してDL</b><br>
-            <span style="color:#cbd5e1;font-size:.9rem;">
+          <div style="flex:1;min-width:210px;background:#475569;
+               border:1px solid #2f3a49;border-radius:10px;padding:14px 16px;box-shadow:0 4px 12px rgba(31,42,55,.12);color:#fff;">
+            <div style="font-size:1.4rem;font-weight:800;">③</div>
+            <b style="color:#fff;">実行してDL</b><br>
+            <span style="color:#dde3ea;font-size:.9rem;">
             <b>🚀 自動補完を実行</b>を押し、結果を確認して<b>💾 補完済みExcel</b>をダウンロード。</span>
           </div>
         </div>
@@ -329,7 +412,7 @@ with st.sidebar:
             "背景画像を選択 (png / jpg)", type=["png", "jpg", "jpeg"], key="bg"
         )
         overlay = st.slider(
-            "背景の暗さ（大きいほど暗く・文字が読みやすい）",
+            "背景の薄さ（大きいほど白く・文字が読みやすい）",
             min_value=0.0, max_value=1.0, value=0.6, step=0.05,
         )
         col_set, col_clear = st.columns(2)
