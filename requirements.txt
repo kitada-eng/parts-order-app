@@ -1,0 +1,9 @@
+openpyxl>=3.1.2
+pandas>=2.1.0
+streamlit>=1.31.0
+pdfplumber>=0.11.0   # PDF見積書の表抽出に使用
+
+# 以下は「Google Cloud のサービスアカウント方式(非公開シート)」を使う場合のみ必要。
+# 公開URL方式(方式A)・ローカルファイル方式(方式B)では不要です。
+# gspread>=6.0.0
+# google-auth>=2.27.0
